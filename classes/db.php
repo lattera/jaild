@@ -29,7 +29,18 @@ class DB {
         var_dump($this->dbh);
     }
 
-    function Query($query) {
-        return $this->dbh->prepare($query);
+    function Query($query, $parameters=array(), $execute=true) {
+        $sth = $this->dbh->prepare($query);
+        if ($execute) {
+            $sth->execute($parameters);
+            return $sth->fetchAll();
+        }
+
+        return $sth;
+    }
+
+    function Execute($query, $parameters=array()) {
+        $sth = $this->dbh->prepare($query);
+        return $sth->execute($parameters);
     }
 }

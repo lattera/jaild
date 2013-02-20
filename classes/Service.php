@@ -21,10 +21,8 @@ class Service {
 
         $services = array();
 
-        $sth = $db->Query("SELECT * FROM jailadmin_services WHERE jail = :jail");
-        $sth->execute(array(":jail" => $jail->name));
-
-        foreach ($sth->fetchAll() as $record)
+        $results = $db->Query("SELECT * FROM jailadmin_services WHERE jail = :jail", array(":jail" => $jail->name));
+        foreach ($results as $record)
             $services[] = Service::LoadFromRecord($jail, $record);
 
         return $services;
@@ -42,14 +40,12 @@ class Service {
     public function Create() {
         global $db;
 
-        $sth = $db->Query("INSERT INTO jailadmin_services (path, jail) VALUES (:path, :jail)");
-        return $sth->execute(array(":path" => $this->path, ":jail" => $this->jail->name));
+        return $db->Execute("INSERT INTO jailadmin_services (path, jail) VALUES (:path, :jail)", array(":path" => $this->path, ":jail" => $this->jail->name));
     }
 
     public function Delete() {
         global $db;
 
-        $sth = $db->Query("DELETE FROM jailadmin_services WHERE jail = :jail AND path = :path");
-        return $sth->execute(array(":jail" => $this->jail->name, ":path" => $this->path));
+        return $db->Execute("DELETE FROM jailadmin_services WHERE jail = :jail AND path = :path", array(":jail" => $this->jail->name, ":path" => $this->path));
     }
 }

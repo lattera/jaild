@@ -24,10 +24,9 @@ class Mount {
 
         $mounts = array();
 
-        $sth = $db->Query("SELECT * FROM jailadmin_mounts WHERE jail = :name");
-        $sth->execute(array(":name" => $jail->name));
+        $results = $db->Query("SELECT * FROM jailadmin_mounts WHERE jail = :name", array(":name" => $jail->name));
 
-        while ($record = $sth->fetch(PDO::FETCH_ASSOC))
+        foreach ($results as $record)
             $mounts[] = Mount::LoadFromRecord($jail, $record);
 
         return $mounts;
@@ -36,10 +35,9 @@ class Mount {
     public static function LoadByTarget($jail, $target) {
         global $db;
 
-        $sth = $db->Query("SELECT * FROM jailadmin_mounts WHRE jail = :name AND target = :target");
-        $sth->execute(array(":name" => $jail->name, ":target" => $target));
+        $results = $db->Query("SELECT * FROM jailadmin_mounts WHRE jail = :name AND target = :target", array(":name" => $jail->name, ":target" => $target));
 
-        foreach ($sth->fetch() as $record)
+        foreach ($results as $record)
             return Mount::LoadFromRecord($jail, $record);
     }
 
@@ -61,9 +59,7 @@ class Mount {
     public function Create() {
         global $db;
 
-        $sth = $db->Query("INSERT INTO jailadmin_mounts (jail, source, target, driver, options) VALUES (:jail, :source, :target, :driver, :options)");
-
-        return $sth->execute(array(
+        return $db->Execute("INSERT INTO jailadmin_mounts (jail, source, target, driver, options) VALUES (:jail, :source, :target, :driver, :options)", array(
             "jail" => $this->jail->name,
             "source" => $this->source,
             "target" => $this->target,
@@ -75,9 +71,7 @@ class Mount {
     public function Delete() {
         global $db;
 
-        $sth = $db->Query("DELETE FROM jailadmin_mounts WHERE jail = :jail AND target = :target");
-
-        return  $sth->execute(array(":jail" => $this->jail->name, ":target" => $this->target));
+        return $db->Execute("DELETE FROM jailadmin_mounts WHERE jail = :jail AND target = :target", array(":jail" => $this->jail->name, ":target" => $this->target));
     }
 
     public function Serialize() {

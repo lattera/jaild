@@ -27,26 +27,20 @@ class Network {
     public static function Load($name) {
         global $db;
 
-        $sth = $db->Query("SELECT * FROM jailadmin_bridges WHERE name = :name");
+        $results = $db->Query("SELECT * FROM jailadmin_bridges WHERE name = :name", array(":name" => $name));
 
-        $sth->execute(array(":name" => $name));
-
-        $result = $sth->fetch(PDO::FETCH_ASSOC);
-        if ($result == false)
-            return false;
-
-        return Network::LoadFromRecord($result);
+        foreach ($results as $result)
+            return Network::LoadFromRecord($result);
     }
 
     public static function LoadAll() {
         global $db;
 
-        $sth = $db->Query("SELECT * FROM jailadmin_bridges");
-        $sth->execute();
+        $results = $db->Query("SELECT * FROM jailadmin_bridges");
 
         $networks = array();
 
-        foreach ($sth->fetchAll() as $record)
+        foreach ($results as $record)
             $networks[] = Network::LoadFromRecord($record);
 
         return $networks;
@@ -61,17 +55,14 @@ class Network {
         $network->device = $record['device'];
 
         /* Load physical devices to add to the bridge */
-        $sth = $db->Query("SELECT device FROM jailadmin_bridge_physicals WHERE bridge = :bridge");
-        $sth->execute(array(":bridge" => $network->name));
-
-        foreach ($sth->fetchAll() as $physical)
+        $results = $db->Query("SELECT device FROM jailadmin_bridge_physicals WHERE bridge = :bridge", array(":bridge" => $network->name));
+        foreach ($results as $physical)
             $network->physicals[] = $physical["device"];
 
-        $sth = $db->Query("SELECT ip FROM jailadmin_bridge_aliases WHERE device = :device");
-        $sth->execute(array(":device" => $network->device));
+        $results = $db->Query("SELECT ip FROM jailadmin_bridge_aliases WHERE device = :device", array(":device" => $network->device));
 
         $network->ips = array();
-        foreach ($sth->fetchAll() as $ip)
+        foreach ($results as $ip)
             $network->ips[] = $ip["ip"];
 
         return $network;
@@ -80,17 +71,13 @@ class Network {
     public static function IsIPAvailable($ip) {
         global $db;
 
-        $sth = $db->Query("SELECT ip FROM jailadmin_bridge_aliases WHERE CHAR_LENGTH(ip) > 0");
-        $sth->execute();
-
-        foreach ($sth->fetchAll() as $record)
+        $results = $db->Query("SELECT ip FROM jailadmin_bridge_aliases WHERE CHAR_LENGTH(ip) > 0");
+        foreach ($results as $record)
             if (!strcmp($record["ip"], $ip))
                 return FALSE;
 
-        $sth = $db->query("SELECT ip FROM jailadmin_epair_aliases WHERE CHAR_LENGTH(ip) > 0");
-        $sth->execute();
-
-        foreach ($$sth->fetchAll() as $record)
+        $results = $db->Query("SELECT ip FROM jailadmin_epair_aliases WHERE CHAR_LENGTH(ip) > 0");
+        foreach ($results as $record)
             if (!strcmp($record["ip"], $ip))
                 return FALSE;
 
@@ -100,10 +87,8 @@ class Network {
     public static function IsDeviceAvailable($device) {
         global $db;
 
-        $sth = $db->Query("SELECT device FROM jailadmin_bridges");
-        $sth->execute();
-
-        foreach ($sth->fetchAll() as $record)
+        $results = $db->Query("SELECT device FROM jailadmin_bridges");
+        foreach ($results as $record)
             if (!strcmp($record["device"], $device))
                 return FALSE;
 
@@ -145,32 +130,26 @@ class Network {
     public function Persist() {
         global $db;
 
-        $sth = $db->Query("UPDATE jailadmin_bridges SET device = :device WHERE name = :name");
-        return $sth->execute(array(":device" => $this->device, ":name" => $this->name));
+        return $db->Execute("UPDATE jailadmin_bridges SET device = :device WHERE name = :name", array(":device" => $this->device, ":name" => $this->name));
     }
 
     public function Create() {
         global $db;
 
-        $sth = $db->Query("INSERT INTO jailadmin_bridges (name, device) VALUES (:name, :device)");
-        return $sth->execute(array(":name" => $this->name, ":device" => $this->device));
+        return $db->Execute("INSERT INTO jailadmin_bridges (name, device) VALUES (:name, :device)", array(":name" => $this->name, ":device" => $this->device));
     }
 
     public function Delete() {
         global $db;
 
-        $sth = $db->Query("DELETE FROM jailadmin_bridges WHERE name = :name");
-        $sth->execute(array(":name" => $this->name));
-
-        $sth = $db->query("DELETE FROM jailadmin_bridge_aliases WHERE device = :device");
-        $sth->execute(array(":device" => $this->device));
+        $db->Execute("DELETE FROM jailadmin_bridges WHERE name = :name", array(":name" => $this->name));
+        $db->Execute("DELETE FROM jailadmin_bridge_aliases WHERE device = :device", array(":device" => $this->device);
     }
 
     public function AddIP($ip) {
         global $db;
 
-        $sth = $db->execute("INSERT INTO jailadmin_bridge_aliases (device, ip) VALUES (:device, :ip)");
-        $sth->execute(array(":device" => $this->device, ":ip" => $ip));
+        $db->Execute("INSERT INTO jailadmin_bridge_aliases (device, ip) VALUES (:device, :ip)", array(":device" => $this->device, ":ip" => $this->ip));
 
         $this->ips[] = $ip;
     }

@@ -23,12 +23,11 @@ class NetworkDevice {
     public static function Load($jail) {
         global $db;
 
-        $sth = $db->Query("SELECT * FROM jailadmin_epairs WHERE jail = :jail");
-        $sth->execute(array(":jail" => $jail->name));
+        $results = $db->Query("SELECT * FROM jailadmin_epairs WHERE jail = :jail", array(":jail" => $jail->name));
 
         $devices = array();
 
-        foreach ($sth->fetchAll() as $record)
+        foreach ($results as $record)
             $devices[] = NetworkDevice::LoadFromRecord($jail, $record);
 
         return $devices;
@@ -37,10 +36,8 @@ class NetworkDevice {
     public static function LoadByDeviceName($jail, $name) {
         global $db;
 
-        $sth = $db->Query("SELECT * FROM jailadmin_epairs WHERE device = :device");
-        $sth->execute(array(":device" => $name));
-
-        foreach ($sth->fetchAll() as $record)
+        $results = $db->Query("SELECT * FROM jailadmin_epairs WHERE device = :device", array(":device" => $name));
+        foreach ($results as $record)
             return NetworkDevice::LoadFromRecord($jail, $record);
     }
 
@@ -115,10 +112,8 @@ class NetworkDevice {
         $net_device->ipv6 = false;
 
         $net_device->ips = array();
-        $sth = $db->Query("SELECT * FROM jailadmin_epair_aliases WHERE device = :device");
-        $sth->execute(array(":device" => $net_device->device));
-
-        foreach ($sth->fetchAll() as $ip_record) {
+        $results = $db->Query("SELECT * FROM jailadmin_epair_aliases WHERE device = :device", array(":device" => $net_device->device);
+        foreach ($results as $ip_record) {
             $net_device->ips[] = $ip_record["ip"];
             if (strstr($ip_record["ip"], ":") !== FALSE)
                 $net_device->ipv6 = true;
@@ -130,11 +125,10 @@ class NetworkDevice {
     public static function IsDeviceAvailable($device) {
         global $db;
 
-        $sth = $db->Query("SELECT device FROM jailadmin_epairs");
-        $sth->execute();
+        $results = $db->Query("SELECT device FROM jailadmin_epairs");
 
-        foreach ($sth->fetchAll() as $record)
-            if (!strcmp($record->device, $device))
+        foreach ($results as $record)
+            if (!strcmp($record["device"], $device))
                 return FALSE;
 
         return TRUE;
@@ -143,12 +137,11 @@ class NetworkDevice {
     public static function NextAvailableDevice() {
         global $db;
 
-        $sth = $db->Query("SELECT device FROM jailadmin_epairs");
-        $sth->execute();
+        $results = $db->Query("SELECT device FROM jailadmin_epairs");
 
         $id = 0;
-        foreach ($sth->fetchAll() as $record) {
-            $i = substr($record->device, strlen("epair"));
+        foreach ($results as $record) {
+            $i = substr($record["device"], strlen("epair"));
             if (intval($i) > $id)
                 $id = intval($i);
         }
@@ -179,11 +172,8 @@ class NetworkDevice {
     public function Delete() {
         global $db;
 
-        $sth = $db->Query("DELETE FROM jailadmin_epairs WHERE device = :device AND jail = :jail");
-        $sth->execute(array(":device" => $this->device, ":jail" => $this->jail->name));
-
-        $sth = $db->Query("DELETE FROM jailadmin_epair_aliases WHERE device = :device");
-        $sth->execute(array(":device" => $this->device));
+        $db->Execute("DELETE FROM jailadmin_epairs WHERE device = :device AND jail = :jail", array(":device" => $this->device, ":jail" => $this->jail->name));
+        $db->Execute("DELETE FROM jailadmin_epair_aliases WHERE device = :device", array(":device" => $this->device));
     }
 
     public function Serialize() {

@@ -31,11 +31,9 @@ class Jail {
     public static function LoadAll() {
         global $db;
 
-        $sth = $db->Query('SELECT name FROM jailadmin_jails');
-        $sth->execute();
         $jails = array();
 
-        foreach ($sth->fetchAll() as $record)
+        foreach ($db->Query("SELECT name FROM jailadmin_jails") as $record)
             $jails[] = Jail::Load($record->name);
 
         return $jails;
@@ -44,10 +42,8 @@ class Jail {
     public static function Load($name) {
         global $db;
 
-        $sth = $db->Query('SELECT * FROM jailadmin_jails WHERE name = :name');
-        $sth->execute(array(':name' => $name));
-
-        foreach ($sth->fetchAll() as $record)
+        $results = $db->Query('SELECT * FROM jailadmin_jails WHERE name = :name', array(":name" => $name));
+        foreach ($results as $record)
             return Jail::LoadFromRecord($record);
 
         return false;
@@ -66,11 +62,10 @@ class Jail {
         $jail->services = Service::Load($jail);
         $jail->mounts = Mount::Load($jail);
 
-        $sth = $db->Query("SELECT source, destination FROM jailadmin_routes WHERE jail = :name");
-        $sth->execute(array(":name" => $jail->name));
+        $results = $db->Query("SELECT source, destination FROM jailadmin_routes WHERE jail = :name", array(":name" => $jail->name));
 
         $jail->routes = array();
-        foreach ($sth->fetchAll() as $route) {
+        foreach ($results as $route) {
             $arr = array();
             $arr['source'] = $route["source"];
             $arr['destination'] = $route["destination"];
@@ -108,8 +103,7 @@ class Jail {
         if ($name == '')
             $name = $snapshot;
 
-        $sth = $db->Query("INSERT INTO jailadmin_templates (name, snapshot) VALUES (:name, :snapshot)");
-        return $sth->execute(array(":name" => $name, ":snapshot" => $snapshot));
+        return $db->Execute("INSERT INTO jailadmin_templates (name, snapshot) VALUES (:name, :snapshot)", array(":name" => $name, ":snapshot" => $snapshot));
     }
 
     public function DeleteSnapshot($snapshot) {
@@ -256,8 +250,7 @@ class Jail {
             exec("/usr/local/bin/sudo zfs clone {$template} {$this->dataset}");
         }
 
-        $sth = $db->Query("INSERT INTO jailadmin_jails (name, dataset) VALUES (:name, :dataset)");
-        return $sth->execute(array(":name" => $this->name, ":dataset" => $this->dataset));
+        return $db->Execute("INSERT INTO jailadmin_jails (name, dataset) VALUES (:name, :dataset)", array(":name" => $this->name, ":dataset" => $this->dataset));
     }
 
     public function Delete($destroy) {
@@ -272,11 +265,8 @@ class Jail {
         foreach ($this->mounts as $m)
             $m->Delete();
 
-        $sth = $db->Query("DELETE FROM jailadmin_routes WHERE jail = :name");
-        $sth->execute(array(":name" => $this->name));
-
-        $sth = $db->Query("DELETE FROM jailadmin_jails WHERE name = :name");
-        $sth->execute(array(":name" => $this->name));
+        $db->Execute("DELETE FROM jailadmin_routes WHERE jail = :name", array(":name" => $this->name));
+        $db->Execute("DELETE FROM jailadmin_jails WHERE name = :name", array(":name" => $this->name));
 
         if ($destroy)
             exec("/usr/local/bin/sudo /sbin/zfs destroy {$this->dataset}");
@@ -285,9 +275,7 @@ class Jail {
     public function Persist() {
         global $db;
 
-        $sth = $db->Query("UPDATE jailadmin_jails SET dataset = :dataset WHERE name = :name");
-
-        return $sth->execute(array(":dataset" => $this->dataset, ":name" => $this->name));
+        return $db->Execute("UPDATE jailadmin_jails SET dataset = :dataset WHERE name = :name", array(":dataset" => $this->dataset, ":name" => $this->name));
     }
 
     public function Serialize() {
@@ -297,6 +285,10 @@ class Jail {
         $serialized["dataset"] = $this->dataset;
         $serialized["online"] = $this->IsOnline();
         $serialized["snapshots"] = $this->GetSnapshots();
+
+        $i=0;
+        foreach ($this->routes as $r)
+            $serialized["route_" . $i++] = $r;
 
         $i=0;
         foreach ($this->network as $n)
