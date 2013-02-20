@@ -112,7 +112,7 @@ class NetworkDevice {
         $net_device->ipv6 = false;
 
         $net_device->ips = array();
-        $results = $db->Query("SELECT * FROM jailadmin_epair_aliases WHERE device = :device", array(":device" => $net_device->device);
+        $results = $db->Query("SELECT * FROM jailadmin_epair_aliases WHERE device = :device", array(":device" => $net_device->device));
         foreach ($results as $ip_record) {
             $net_device->ips[] = $ip_record["ip"];
             if (strstr($ip_record["ip"], ":") !== FALSE)

@@ -143,7 +143,7 @@ class Network {
         global $db;
 
         $db->Execute("DELETE FROM jailadmin_bridges WHERE name = :name", array(":name" => $this->name));
-        $db->Execute("DELETE FROM jailadmin_bridge_aliases WHERE device = :device", array(":device" => $this->device);
+        $db->Execute("DELETE FROM jailadmin_bridge_aliases WHERE device = :device", array(":device" => $this->device));
     }
 
     public function AddIP($ip) {
