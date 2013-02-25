@@ -26,7 +26,6 @@ class DB {
         $this->db = $db;
 
         $this->dbh = new PDO("mysql:host={$this->server};dbname={$this->db}", $this->username, $this->password);
-        var_dump($this->dbh);
     }
 
     function Query($query, $parameters=array(), $execute=true) {

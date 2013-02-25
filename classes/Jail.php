@@ -34,7 +34,7 @@ class Jail {
         $jails = array();
 
         foreach ($db->Query("SELECT name FROM jailadmin_jails") as $record)
-            $jails[] = Jail::Load($record->name);
+            $jails[] = Jail::Load($record["name"]);
 
         return $jails;
     }
