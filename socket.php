@@ -163,6 +163,125 @@ class Socket {
     }
 
     public function epair_act() {
+        global $db;
+
+        if (!array_key_exists("subaction", $this->json))
+            return array("statusCode" => "ERROR", "statusMsg" => "Subaction required");
+
+        if (!array_key_exists("jail", $this->json))
+            return array("statusCode" => "ERROR", "statusMsg" => "Jail not specified");
+
+        $jail = Jail::Load($this->json["jail"]);
+        if ($jail === false)
+            return array("statusCode" => "ERROR", "statusMsg" => "Jail not found");
+
+        switch ($this->json["subaction"]) {
+            case "create":
+                if (!array_key_exists("network", $this->json))
+                    return array("statusCode" => "ERROR", "statusMsg" => "Network not specified");
+
+                $network = Network::Load($this->json["network"]);
+                if ($network === false)
+                    return array("statusCode" => "ERROR", "statusMsg" => "Network not found");
+
+                if (!NetworkDevice::IsDeviceAvailable($this->json["device"])) {
+                    return array(
+                        "statusCode" => "ERROR",
+                        "statusMsg" => "Device unavailable. Suggested device: "
+                            . NetworkDevice::NextAvailableDevice()
+                        );
+                }
+
+                $device = new NetworkDevice;
+                $device->jail = $jail;
+                $device->bridge = $network;
+                $device->device = $this->json["device"];
+                $device->is_span = false;
+                $device->dhcp = false;
+
+                if (array_key_exists("is_span", $this->json) && $this->json["is_span"])
+                    $this->is_span = true;
+                if (array_key_exists("dhcp", $this->json) && $this->json["dhcp"])
+                    $this->dhcp = true;
+
+                $device->Create();
+
+                $statusMsg = "";
+                if (array_key_exists("ips", $this->json)) {
+                    foreach ($this->json["ips"] as $ip) {
+                        if (Network::IsIPAvailable($ip)) {
+                            $db->Execute("INSERT INTO jailadmin_epair_aliases (device, ip) VALUES (:device, :ip)",
+                                array(":device" => $device->device, ":ip" => $ip);
+                        } else {
+                            $statusMsg .= (strlen($statusMsg) ? ", " : "") . "IP {$ip} is unavailable";
+                        }
+                    }
+                }
+
+                if (strlen($statusMsg))
+                    return array("statusCode" => "WARNING", "statusMsg" => $statusMsg);
+
+                break;
+            case "delete":
+                foreach ($jail->network as $n)
+                    if ($n->device == $this->json["device"])
+                        $n->device->Delete();
+                break;
+            case "add ip":
+                if (!Network::IsIPAvailable($this->json["ip"]))
+                    return array("statusCode" => "ERROR", "statusMsg" => "The IP is unavailable");
+
+                $device = null;
+                foreach ($jail->network as $n)
+                    if ($n->device == $this->json["device"])
+                        $device = $n;
+
+                if ($device == null)
+                    return array("statusCode" => "ERROR", "statusMsg" => "The device doesn't exist");
+
+                $db->Execute("INSERT INTO jailadmin_epair_aliases (device, ip) VALUES (:device, :ip)",
+                    array(":device" => $device->device, ":ip" => $this->json["ip"]));
+
+                break;
+            case "delete ip":
+                foreach ($jail->network as $n) {
+                    if ($n->device == $this->json["device"] && in_array($this->json["ip"], $n->ips)) {
+                        $db->Execute("DELETE FROM jailadmin_epair_aliases WHERE device = :device AND ip = :ip",
+                            array(":device" => $n->device, ":ip" => $this->json["ip"]));
+                        break;
+                    }
+                }
+
+                break;
+            case "set option":
+                switch ($this->json["option"]) {
+                    case "dhcp":
+                        foreach ($jail->network as $n) {
+                            if ($n->device == $this->json["device"]) {
+                                $db->Execute("UPDATE jailadmin_epair SET dhcp = :dhcp WHERE device = :device",
+                                    array(":dhcp" => ($this->json["dhcp"] ? "1" : "0"), ":device" => $n->device);
+                                break;
+                            }
+                        }
+
+                        break;
+                    case "span":
+                        foreach ($jail->network as $n) {
+                            if ($n->device == $this->json["device"]) {
+                                $db->Execute("UPDATE jailadmin SET is_span = :span WHERE device = :device",
+                                    array(":span" => ($this->json["span"] ? "1" : "0"), ":device" => $n->device);
+                                break;
+                            }
+                        }
+
+                        break;
+                    default:
+                        return array("statusCode" => "ERROR", "statusMsg" => "Invalid option");
+                }
+            default:
+                return array("statusCode" => "ERROR", "statusMsg" => "Invalid subaction");
+        }
+
         return array("statusCode" => "OKAY");
     }
 
