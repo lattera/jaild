@@ -20,6 +20,8 @@ class Jail {
     public $network;
     public $services;
     public $mounts;
+    public $autoboot;
+    public $hostname;
     private $_snapshots;
 
     function __construct() {
@@ -35,6 +37,17 @@ class Jail {
 
         foreach ($db->Query("SELECT name FROM jailadmin_jails") as $record)
             $jails[] = Jail::Load($record["name"]);
+
+        return $jails;
+    }
+
+    public static function LoadAllAutoboot() {
+        global $db;
+
+        $jails = array();
+
+        foreach ($db->Query("SELECT * FROM jailadmin_jails WHERE autoboot = 1") as $record)
+            $jails[] = Jail::LoadFromRecord($record);
 
         return $jails;
     }
@@ -57,7 +70,9 @@ class Jail {
 
         $jail = new Jail;
         $jail->name = $record['name'];
+        $jail->autoboot = ($record['autoboot'] == 1);
         $jail->dataset = $record['dataset'];
+        $jail->hostname = $record['hostname'];
         $jail->network = NetworkDevice::Load($jail);
         $jail->services = Service::Load($jail);
         $jail->mounts = Mount::Load($jail);
@@ -154,8 +169,10 @@ class Jail {
             if ($this->Stop() == FALSE)
                 return FALSE;
 
+        $hostname = (strlen($this->hostname) == 0) ? $this->name : $this->hostname;
+
         exec("/usr/local/bin/sudo /sbin/mount -t devfs devfs {$this->path}/dev");
-        exec("/usr/local/bin/sudo /usr/sbin/jail -c vnet 'name={$this->name}' 'host.hostname={$this->name}' 'path={$this->path}' persist");
+        exec("/usr/local/bin/sudo /usr/sbin/jail -c vnet 'name={$this->name}' 'host.hostname={$hostname}' 'path={$this->path}' persist");
 
         foreach ($this->network as $n)
             $n->BringHostOnline();
@@ -250,7 +267,12 @@ class Jail {
             exec("/usr/local/bin/sudo zfs clone {$template} {$this->dataset}");
         }
 
-        return $db->Execute("INSERT INTO jailadmin_jails (name, dataset) VALUES (:name, :dataset)", array(":name" => $this->name, ":dataset" => $this->dataset));
+        return $db->Execute("INSERT INTO jailadmin_jails (name, dataset, hostname) VALUES (:name, :dataset, :hostname)",
+            array(
+                ":name" => $this->name,
+                ":dataset" => $this->dataset,
+                ":hostname" => $this->hostname,
+            ));
     }
 
     public function Delete($destroy) {
@@ -275,7 +297,12 @@ class Jail {
     public function Persist() {
         global $db;
 
-        return $db->Execute("UPDATE jailadmin_jails SET dataset = :dataset WHERE name = :name", array(":dataset" => $this->dataset, ":name" => $this->name));
+        return $db->Execute("UPDATE jailadmin_jails SET dataset = :dataset, hostname = :hostname WHERE name = :name",
+            array(
+                ":dataset" => $this->dataset,
+                ":hostname" => $this->hostname,
+                ":name" => $this->name,
+            ));
     }
 
     public function Serialize() {
@@ -285,6 +312,7 @@ class Jail {
         $serialized["dataset"] = $this->dataset;
         $serialized["online"] = $this->IsOnline();
         $serialized["snapshots"] = $this->GetSnapshots();
+        $serialized["hostname"] = $this->hostname;
 
         $i=0;
         foreach ($this->routes as $r)

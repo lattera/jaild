@@ -29,23 +29,73 @@ if (posix_getuid() != 0) {
 require_once($argv[2]);
 
 $db = new DB($server, $username, $password, $database);
-$sock = socket_create_listen($argv[1]);
-if ($sock === false) {
+$sock4 = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+if ($sock4 === false) {
     echo "ERROR: Could not create listening socket";
     exit(1);
 }
-socket_set_nonblock($sock);
+socket_set_nonblock($sock4);
+if (socket_set_option($sock4, SOL_SOCKET, SO_REUSEADDR, 1) == FALSE) {
+    echo "ERROR: Could not set SO_REUSEADDR: " . socket_strerror(socket_last_error($sock4));
+    socket_close($sock4);
+    exit(1);
+}
+if (socket_bind($sock4, "0.0.0.0", $argv[1]) == FALSE) {
+    echo "ERROR: Could not bind to 0.0.0.0";
+    socket_close($sock4);
+    exit(1);
+}
+$sock6 = socket_create(AF_INET6, SOCK_STREAM, SOL_TCP);
+if ($sock6 === false) {
+    socket_close($sock4);
+    echo "ERROR: Could not create listening socket";
+    exit(1);
+}
+socket_set_nonblock($sock6);
+if (socket_set_option($sock6, SOL_SOCKET, SO_REUSEADDR, 1) == FALSE) {
+    echo "ERROR: Could not set SO_REUSEADDR: " . socket_strerror(socket_last_error($sock4));
+    socket_close($sock4);
+    socket_close($sock6);
+    exit(1);
+}
+if (socket_bind($sock6, "::0", $argv[1]) == FALSE) {
+    echo "ERROR: Could not bind to ::0";
+    socket_close($sock4);
+    socket_close($sock6);
+    exit(1);
+}
+
 $clients = array();
 
+function sig_handler($signo) {
+    global $clients;
+
+    foreach ($clients as $client)
+        socket_close($client->fd);
+
+    socket_close($sock4);
+    socket_close($sock6);
+
+    exit(0);
+}
+
+pcntl_signal(SIGTERM, "sig_handler");
+pcntl_signal(SIGHUP, "sig_handler");
+pcntl_signal(SIGINT, "sig_handler");
+
+/* Boot up all the jails that are set to autoboot */
+foreach (Jail::LoadAllAutoboot() as $jail)
+    $jail->Start();
+
 while (true) {
-    $read = array($sock);
+    $read = array($sock4, $sock6);
     $null = NULL;
     foreach ($clients as $client)
         $read[] = $client->fd;
 
     $num = socket_select($read, $null, $null, $null);
-    if (in_array($sock, $read)) {
-        if (($newsock = socket_accept($sock)) != NULL) {
+    if (in_array($sock4, $read)) {
+        if (($newsock = socket_accept($sock4)) != NULL) {
             $newSock = new Socket;
             $newSock->fd = $newsock;
             $newSock->buffer = "";
@@ -53,7 +103,19 @@ while (true) {
             $clients[] = $newSock;
         }
 
-        $key = array_search($sock, $read);
+        $key = array_search($sock4, $read);
+        unset($read[$key]);
+    }
+    if (in_array($sock6, $read)) {
+        if (($newsock = socket_accept($sock6)) != NULL) {
+            $newSock = new Socket;
+            $newSock->fd = $newsock;
+            $newSock->buffer = "";
+
+            $clients[] = $newSock;
+        }
+
+        $key = array_search($sock6, $read);
         unset($read[$key]);
     }
 

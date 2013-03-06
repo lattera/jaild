@@ -123,6 +123,22 @@ class Socket {
                     $jail["statusCode"] = "OKAY";
                 }
                 break;
+            case "autoboot":
+                $jails = Jail::LoadAllAutoboot();
+                if ($jail === false) {
+                    $ret["statusCode"] = "ERROR";
+                    $ret["statusMsg"] = "No such jail";
+                } else {
+                    foreach ($jails as $jail) {
+                        if ($jail->Start() == false) {
+                            $ret["statusCode"] = "ERROR";
+                            $ret["statusMsg"] .= (strlen($ret["statusMsg"]) ? ", " : "") . "Failed to start jail {$jail->name}";
+                        } else {
+                            $ret["statusCode"] = "OKAY";
+                        }
+                    }
+                }
+                break;
             case "start jail":
                 $jail = Jail::Load($this->json["name"]);
                 if ($jail === false) {
@@ -211,7 +227,7 @@ class Socket {
                     foreach ($this->json["ips"] as $ip) {
                         if (Network::IsIPAvailable($ip)) {
                             $db->Execute("INSERT INTO jailadmin_epair_aliases (device, ip) VALUES (:device, :ip)",
-                                array(":device" => $device->device, ":ip" => $ip);
+                                array(":device" => $device->device, ":ip" => $ip));
                         } else {
                             $statusMsg .= (strlen($statusMsg) ? ", " : "") . "IP {$ip} is unavailable";
                         }
@@ -259,7 +275,7 @@ class Socket {
                         foreach ($jail->network as $n) {
                             if ($n->device == $this->json["device"]) {
                                 $db->Execute("UPDATE jailadmin_epair SET dhcp = :dhcp WHERE device = :device",
-                                    array(":dhcp" => ($this->json["dhcp"] ? "1" : "0"), ":device" => $n->device);
+                                    array(":dhcp" => ($this->json["dhcp"] ? "1" : "0"), ":device" => $n->device));
                                 break;
                             }
                         }
@@ -269,7 +285,7 @@ class Socket {
                         foreach ($jail->network as $n) {
                             if ($n->device == $this->json["device"]) {
                                 $db->Execute("UPDATE jailadmin SET is_span = :span WHERE device = :device",
-                                    array(":span" => ($this->json["span"] ? "1" : "0"), ":device" => $n->device);
+                                    array(":span" => ($this->json["span"] ? "1" : "0"), ":device" => $n->device));
                                 break;
                             }
                         }
